@@ -3,6 +3,7 @@ package work
 import (
 	"fmt"
 	"reflect"
+	"runtime/debug"
 
 	commonlog "github.com/wallester/common/log"
 )
@@ -42,6 +43,7 @@ func runJob(job *Job, ctxType reflect.Type, middleware []*middlewareHandler, jt 
 
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
+			debug.PrintStack()
 			// err turns out to be interface{}, of actual type "runtime.errorCString"
 			// Luckily, the err sprints nicely via fmt.
 			errorishError := fmt.Errorf("%v", panicErr)
