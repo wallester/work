@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"runtime/debug"
 
-	commonlog "github.com/wallester/common/log"
+	commonlog "github.com/wallester/monorepo/pkg/common/log"
 )
 
 // returns an error if the job fails, or there's a panic, or we couldn't reflect correctly.

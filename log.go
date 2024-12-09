@@ -2,7 +2,7 @@ package work
 
 import (
 	"github.com/juju/errors"
-	commonlog "github.com/wallester/common/log"
+	commonlog "github.com/wallester/monorepo/pkg/common/log"
 )
 
 func logError(key string, err error) {
