@@ -34,8 +34,8 @@ func buildBody(ctx context.Context, configuration configuration, diagnostic diag
 			"name":    NAME,
 			"version": VERSION,
 			"diagnostic": map[string]interface{}{
-				"languageVersion": diagnostic.languageVersion,
-				"configuredOptions": diagnostic.configuredOptions,
+				"languageVersion":   diagnostic.languageVersion,
+				"configuredOptions": buildConfiguredOptions(configuration),
 			},
 		},
 	}
@@ -50,16 +50,23 @@ func buildBody(ctx context.Context, configuration configuration, diagnostic diag
 		person = &configuration.person
 	}
 	if person.Id != "" {
-		data["person"] = map[string]string{
+		personData := map[string]string{
 			"id":       person.Id,
 			"username": person.Username,
 			"email":    person.Email,
 		}
+		for key, value := range person.Extra {
+			// If the field on the extra map is already specified then skip it.
+			// This will prevent the extra map from overwriting fields like ID, Username or Email.
+			if _, ok := personData[key]; !ok {
+				personData[key] = value
+			}
+		}
+		data["person"] = personData
 	}
 
 	return map[string]interface{}{
-		"access_token": configuration.token,
-		"data":         data,
+		"data": data,
 	}
 }
 
@@ -77,10 +84,37 @@ func buildCustom(custom map[string]interface{}, extras map[string]interface{}) m
 	return m
 }
 
-func addErrorToBody(configuration configuration, body map[string]interface{}, err error, skip int) map[string]interface{} {
+func buildConfiguredOptions(configuration configuration) map[string]interface{} {
+	return map[string]interface{}{
+		"environment":    configuration.environment,
+		"endpoint":       configuration.endpoint,
+		"platform":       configuration.platform,
+		"codeVersion":    configuration.codeVersion,
+		"serverHost":     configuration.serverHost,
+		"serverRoot":     configuration.serverRoot,
+		"fingerprint":    configuration.fingerprint,
+		"scrubHeaders":   configuration.scrubHeaders,
+		"scrubFields":    configuration.scrubFields,
+		"transform":      functionToString(configuration.transform),
+		"unwrapper":      functionToString(configuration.unwrapper),
+		"stackTracer":    functionToString(configuration.stackTracer),
+		"checkIgnore":    functionToString(configuration.checkIgnore),
+		"captureIp":      configuration.captureIp,
+		"itemsPerMinute": configuration.itemsPerMinute,
+		"person": map[string]string{
+			"Id":       configuration.person.Id,
+			"Username": configuration.person.Username,
+			"Email":    configuration.person.Email,
+		},
+	}
+}
+
+func addErrorToBody(configuration configuration, body map[string]interface{}, err error, skip int, telemetry []interface{}) map[string]interface{} {
 	data := body["data"].(map[string]interface{})
 	errBody, fingerprint := errorBody(configuration, err, skip)
-	data["body"] = errBody
+	dataBody := errBody
+	dataBody["telemetry"] = telemetry
+	data["body"] = dataBody
 	if configuration.fingerprint {
 		data["fingerprint"] = fingerprint
 	}
@@ -120,7 +154,9 @@ func remoteIP(req *http.Request) string {
 		ips := strings.Split(forwardedIPs, ", ")
 		return ips[0]
 	}
-	return req.RemoteAddr
+	remoteAddr := req.RemoteAddr
+	spltRemoteAddr := strings.Split(remoteAddr, ":")
+	return spltRemoteAddr[0]
 }
 
 // filterFlatten filters sensitive information like passwords from being sent to Rollbar, and
@@ -303,4 +339,8 @@ func errorClass(err error) string {
 	} else {
 		return strings.TrimPrefix(class, "*")
 	}
+}
+
+func functionToString(function interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(function).Pointer()).Name()
 }
